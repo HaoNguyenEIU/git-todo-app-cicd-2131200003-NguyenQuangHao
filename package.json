@@ -1,0 +1,29 @@
+{
+  "name": "electron-todo-mvc",
+  "version": "1.0.0",
+  "description": "A To-Do app demonstrating design patterns and testing.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "jest tests/unit",
+    "test:integration": "jest tests/integration",
+    "test:e2e": "npx playwright test tests/e2e",
+    "build": "electron-builder --publish=never"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "^1.42.1",
+    "electron": "^29.1.5",
+    "electron-builder": "^24.13.3",
+    "jest": "^29.7.0"
+  },
+  "build": {
+    "appId": "com.example.electron-todo",
+    "productName": "TodoApp",
+    "files": [
+      "**/*"
+    ]
+  }
+}

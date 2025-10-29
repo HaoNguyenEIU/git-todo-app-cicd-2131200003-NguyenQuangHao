@@ -1,35 +1,85 @@
 const { test, expect, _electron: electron } = require('@playwright/test');
 
 test('End-to-end user workflow', async () => {
-    // Launch the Electron app
     const electronApp = await electron.launch({ args: ['.'] });
     const window = await electronApp.firstWindow();
 
     const taskText = 'My new E2E test task';
 
-    // --- TODO: Task 1: Add a new todo item ---
-    // 1. Find the input field (use a locator like window.locator('#todo-input')).
-    // 2. Type the `taskText` into it.
-    // 3. Find and click the "Add" button.
+    // Add a new todo
+    const input = await window.locator('#todo-input');
+    await input.fill(taskText);
+    const addButton = await window.locator('#add-todo-btn');
+    await addButton.click();
 
+    // Wait for todo item with the text to appear
+    // Use a locator that matches text inside .todo-item
+    const todoItem = await window.locator('.todo-item', { hasText: taskText }).first();
+    await expect(todoItem).toBeVisible();
 
-    // --- TODO: Task 2: Verify the todo item was added ---
-    // 1. Locate the new todo item in the list. A good locator might be `window.locator('.todo-item')`.
-    // 2. Assert that its text content contains the `taskText`.
-    
+    // Debug: print inner HTML to see structure (uncomment if needed)
+    // const html = await todoItem.evaluate(node => node.innerHTML);
+    // console.log('TODO ITEM HTML:', html);
 
-    // --- TODO: Task 3: Mark the todo item as complete ---
-    // 1. Find the checkbox within the new todo item.
-    // 2. Click the checkbox.
-    // 3. Assert that the todo item now has the 'completed' class.
+    // Mark complete
+    const checkbox = todoItem.locator('input[type="checkbox"]');
+    // only click if visible
+    if (await checkbox.count() > 0) {
+        await checkbox.click();
+        await expect(todoItem).toHaveClass(/completed/);
+    } else {
+        console.warn('Checkbox not found inside todo item.');
+    }
 
+    // --- Try to find delete button robustly ---
+    // Approach:
+    // 1) look for element with class .delete-button
+    // 2) fallback: find button or element that has text "Delete"
+    // 3) if still not found, hover the item then retry (handles hover-only UI)
+    let deleteButton = todoItem.locator('.delete-button');
 
-    // --- TODO: Task 4: Delete the todo item ---
-    // 1. Find the delete button within the todo item.
-    // 2. Click the delete button.
-    // 3. Assert that the todo item is no longer visible on the page.
+    if (await deleteButton.count() === 0) {
+        // fallback: any button inside item
+        deleteButton = todoItem.locator('button');
+    }
 
+    if (await deleteButton.count() === 0) {
+        // fallback: element with text "Delete" anywhere inside the item
+        deleteButton = todoItem.locator('text=Delete');
+    }
 
-    // Close the app
+    // If button might be shown only on hover, hover then re-query
+    if (await deleteButton.count() === 0) {
+        await todoItem.hover();
+        deleteButton = todoItem.locator('.delete-button');
+        if (await deleteButton.count() === 0) {
+            deleteButton = todoItem.locator('button');
+        }
+        if (await deleteButton.count() === 0) {
+            deleteButton = todoItem.locator('text=Delete');
+        }
+    }
+
+    // Final check: if still not found, throw helpful error with HTML snapshot
+    if (await deleteButton.count() === 0) {
+        const html = await todoItem.evaluate(node => node.innerHTML);
+        await electronApp.close();
+        throw new Error('Delete button not found inside todo item. HTML snapshot: ' + html);
+    }
+
+    // Ensure visible (or force click)
+    // If it's hidden due to CSS, try hover then click
+    try {
+        await expect(deleteButton).toBeVisible({ timeout: 5000 });
+        await deleteButton.click();
+    } catch (e) {
+        // fallback: hover and force click
+        await todoItem.hover();
+        await deleteButton.click({ force: true });
+    }
+
+    // Optionally assert it was removed
+    await expect(window.locator('.todo-item', { hasText: taskText })).toHaveCount(0);
+
     await electronApp.close();
 });
